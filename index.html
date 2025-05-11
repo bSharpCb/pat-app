@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Camera Capture with Categories</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 1rem;
+      max-width: 600px;
+    }
+    video, canvas {
+      width: 100%;
+      max-height: 300px;
+      border: 1px solid #ccc;
+      margin-bottom: 1rem;
+      object-fit: contain;
+    }
+    label {
+      display: block;
+      margin-top: 1rem;
+      font-weight: bold;
+    }
+    select, input[type="text"], button {
+      width: 100%;
+      padding: 0.5rem;
+      margin-top: 0.25rem;
+      font-size: 1rem;
+    }
+    #entries {
+      margin-top: 2rem;
+      border-top: 1px solid #ccc;
+      padding-top: 1rem;
+    }
+    .entry {
+      border: 1px solid #ddd;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .entry img {
+      max-width: 100px;
+      max-height: 100px;
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Take Picture and Add Caption with Categories</h1>
+
+  <video id="video" autoplay playsinline></video>
+  <button id="captureBtn">Take Picture</button>
+  <canvas id="canvas" style="display:none;"></canvas>
+  <img id="photoPreview" alt="Photo preview" style="display:none; margin-bottom:1rem;" />
+
+  <form id="entryForm" style="display:none;">
+    <label for="caption">Caption:</label>
+    <input type="text" id="caption" name="caption" required />
+
+    <label for="category1">Category 1:</label>
+    <select id="category1" name="category1" required>
+      <option value="" disabled selected>Select Category 1</option>
+      <option value="placeholder1">placeholder1</option>
+      <option value="placeholder2">placeholder2</option>
+      <option value="placeholder3">placeholder3</option>
+    </select>
+
+    <label for="category2">Category 2:</label>
+    <select id="category2" name="category2" required disabled>
+      <option value="" disabled selected>Select Category 2</option>
+    </select>
+
+    <button type="submit" style="margin-top:1rem;">Save Entry</button>
+  </form>
+
+  <div id="entries">
+    <h2>Saved Entries</h2>
+    <div id="entriesList"></div>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const captureBtn = document.getElementById('captureBtn');
+    const canvas = document.getElementById('canvas');
+    const photoPreview = document.getElementById('photoPreview');
+    const entryForm = document.getElementById('entryForm');
+    const captionInput = document.getElementById('caption');
+    const category1Select = document.getElementById('category1');
+    const category2Select = document.getElementById('category2');
+    const entriesList = document.getElementById('entriesList');
+
+    // Subcategories mapping
+    const subcategories = {
+      placeholder1: ['placeholder1A', 'placeholder1B', 'placeholder1C'],
+      placeholder2: ['placeholder2A', 'placeholder2B', 'placeholder2C'],
+      placeholder3: ['placeholder3A', 'placeholder3B', 'placeholder3C']
+    };
+
+    let entries = [];
+    let currentImageDataUrl = null;
+
+    // Access camera
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (err) {
+        alert('Error accessing camera: ' + err.message);
+      }
+    }
+
+    // Populate Category 2 based on Category 1 selection
+    category1Select.addEventListener('change', () => {
+      const selectedCat1 = category1Select.value;
+      category2Select.innerHTML = '<option value="" disabled selected>Select Category 2</option>';
+      if (subcategories[selectedCat1]) {
+        subcategories[selectedCat1].forEach(subcat => {
+          const option = document.createElement('option');
+          option.value = subcat;
+          option.textContent = subcat;
+          category2Select.appendChild(option);
+        });
+        category2Select.disabled = false;
+      } else {
+        category2Select.disabled = true;
+      }
+    });
+
+    // Capture photo
+    captureBtn.addEventListener('click', () => {
+      const context = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      currentImageDataUrl = canvas.toDataURL('image/png');
+      photoPreview.src = currentImageDataUrl;
+      photoPreview.style.display = 'block';
+      entryForm.style.display = 'block';
+      // Hide video and capture button after photo taken
+      video.style.display = 'none';
+      captureBtn.style.display = 'none';
+    });
+
+    // Handle form submission
+    entryForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!currentImageDataUrl) {
+        alert('Please take a picture first.');
+        return;
+      }
+      const caption = captionInput.value.trim();
+      const category1 = category1Select.value;
+      const category2 = category2Select.value;
+
+      if (!caption || !category1 || !category2) {
+        alert('Please fill in all fields.');
+        return;
+      }
+
+      const entry = {
+        image: currentImageDataUrl,
+        caption,
+        category1,
+        category2
+      };
+      entries.push(entry);
+      displayEntries();
+      resetForNewEntry();
+    });
+
+    // Display saved entries
+    function displayEntries() {
+      entriesList.innerHTML = '';
+      entries.forEach((entry, index) => {
+        const div = document.createElement('div');
+        div.className = 'entry';
+        div.innerHTML = `
+          <img src="${entry.image}" alt="Entry ${index + 1}" />
+          <strong>Caption:</strong> ${entry.caption}<br/>
+          <strong>Category 1:</strong> ${entry.category1}<br/>
+          <strong>Category 2:</strong> ${entry.category2}
+        `;
+        entriesList.appendChild(div);
+      });
+    }
+
+    // Reset UI for new entry
+    function resetForNewEntry() {
+      currentImageDataUrl = null;
+      captionInput.value = '';
+      category1Select.value = '';
+      category2Select.innerHTML = '<option value="" disabled selected>Select Category 2</option>';
+      category2Select.disabled = true;
+      entryForm.style.display = 'none';
+      photoPreview.style.display = 'none';
+      video.style.display = 'block';
+      captureBtn.style.display = 'inline-block';
+    }
+
+    // Initialize
+    resetForNewEntry();
+    startCamera();
+  </script>
+</body>
+</html>
